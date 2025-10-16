@@ -49,10 +49,14 @@ ENV/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Visualizations
-visualizations/*
-!visualizations/README.md
+# Visualizations - Include all files in visualizations directory
+!visualizations/
+!visualizations/*
 
-# Reports
-reports/*
-!reports/README.md
+# Reports - Include all files in reports directory
+!reports/
+!reports/*
+
+# Ignore large data files in data/ directory (if any)
+data/*
+!data/README.md
