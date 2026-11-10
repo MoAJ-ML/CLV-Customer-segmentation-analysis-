@@ -24,7 +24,7 @@ def calculate_rfm_scores(rfm: pd.DataFrame) -> pd.DataFrame:
     # Use clipped monetary values only for scores and clustering.
     rfm['Monetary'] = winsorize_column(rfm['Monetary'])
     
-    # Cap recency at 700 days (consider older as churned)
+    # Cap recency for scoring only; this does not establish churn status.
     rfm['Recency'] = np.minimum(rfm['Recency'], 700)
     
     # Calculate scores with rank-based approach to handle duplicates
@@ -127,20 +127,19 @@ def generate_segment_analysis(rfm: pd.DataFrame) -> None:
     plt.close()
 
 def generate_segment_summary(rfm: pd.DataFrame) -> pd.DataFrame:
-    """Generate summary statistics for each segment."""
-    summary = rfm.groupby('Segment_Name').agg({
-        'CustomerID': 'count',
-        'Recency': 'mean',
-        'Frequency': 'mean',
-        'Monetary': ['mean', 'sum']
-    }).round(2)
-    
-    # Calculate percentages
-    summary[('CustomerID', 'percentage')] = (summary[('CustomerID', 'count')] / len(rfm) * 100).round(1)
-    summary[('Monetary', 'revenue_share')] = (summary[('Monetary', 'sum')] / rfm['Monetary'].sum() * 100).round(1)
-    
-    # Flatten column names
-    summary.columns = ['_'.join(col).strip() for col in summary.columns.values]
+    """Summarize observed positive-sale revenue, not clipped scoring values."""
+    revenue_col = 'Monetary_raw' if 'Monetary_raw' in rfm else 'Monetary'
+    summary = rfm.groupby('Segment_Name').agg(
+        Customer_Count=('CustomerID', 'count'),
+        Avg_Recency=('Recency', 'mean'),
+        Avg_Frequency=('Frequency', 'mean'),
+        Avg_Observed_Revenue=(revenue_col, 'mean'),
+        Total_Observed_Revenue=(revenue_col, 'sum'),
+    ).round(2)
+    summary['Customer_Share_Percent'] = (summary['Customer_Count'] / len(rfm) * 100).round(1)
+    summary['Observed_Revenue_Share_Percent'] = (
+        summary['Total_Observed_Revenue'] / rfm[revenue_col].sum() * 100
+    ).round(1)
     
     # Save to CSV
     summary.to_csv('../visualizations/segment_summary.csv')

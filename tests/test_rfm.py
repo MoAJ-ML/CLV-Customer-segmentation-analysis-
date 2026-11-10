@@ -8,7 +8,7 @@ import pandas as pd
 from prepare_data import convert_workbook
 from src.data_preprocessing import load_and_clean_data
 from src.feature_engineering import create_rfm_features
-from src.rfm_enhanced import calculate_rfm_scores
+from src.rfm_enhanced import calculate_rfm_scores, generate_segment_summary
 from src.advanced_analysis import AdvancedRFMAnalysis
 
 
@@ -67,6 +67,24 @@ class RFMTests(unittest.TestCase):
             finally:
                 os.chdir(previous)
         self.assertEqual(metrics['Total_Revenue'].sum(), 1030.0)
+
+    def test_segment_summary_uses_observed_revenue(self):
+        frame = pd.DataFrame({
+            'CustomerID': [1, 2], 'Segment_Name': ['A', 'B'],
+            'Recency': [1, 2], 'Frequency': [1, 1],
+            'Monetary': [10.0, 10.0], 'Monetary_raw': [10.0, 90.0],
+        })
+        with TemporaryDirectory() as folder:
+            previous = os.getcwd()
+            (Path(folder) / 'analysis').mkdir()
+            (Path(folder) / 'visualizations').mkdir()
+            os.chdir(Path(folder) / 'analysis')
+            try:
+                summary = generate_segment_summary(frame)
+            finally:
+                os.chdir(previous)
+        self.assertEqual(summary.loc['B', 'Total_Observed_Revenue'], 90.0)
+        self.assertEqual(summary.loc['B', 'Observed_Revenue_Share_Percent'], 90.0)
 
 
 if __name__ == '__main__':
