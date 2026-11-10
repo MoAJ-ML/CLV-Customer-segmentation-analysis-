@@ -3,22 +3,25 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import argparse
 from src.advanced_analysis import AdvancedRFMAnalysis
 from src.data_preprocessing import load_and_clean_data
 from src.feature_engineering import create_rfm_features
 from src.rfm_enhanced import calculate_rfm_scores, segment_customers_enhanced
 
-def main():
+def main(data_path='data/online_retail_II.csv'):
     print("🚀 Starting Advanced RFM Analysis...")
     
     # Ensure directories exist
     os.makedirs("visualizations", exist_ok=True)
     os.makedirs("reports", exist_ok=True)
     
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f'Missing {data_path}. See README.md for dataset acquisition or use --data with a CSV path.')
     try:
         # Load and preprocess data
         print("\n📊 Loading and cleaning data...")
-        df = load_and_clean_data("data/online_retail_II.csv")
+        df = load_and_clean_data(data_path)
         print(f"✅ Data loaded successfully. Shape: {df.shape}")
         
         # Create RFM features
@@ -47,6 +50,7 @@ def main():
         print(f"\n❌ An error occurred: {str(e)}")
         import traceback
         traceback.print_exc()
+        raise
 
 def generate_summary_report(results: dict) -> None:
     """Generate a markdown summary report of the analysis."""
@@ -57,10 +61,7 @@ def generate_summary_report(results: dict) -> None:
     total_customers = metrics['Customer_Count'].sum()
     total_revenue = metrics['Total_Revenue'].sum()
     top_segment_rev_share = metrics['Revenue_Share'].max()
-    gini = 1 - 2 * np.trapz(
-        np.sort(metrics['Total_Revenue'] / metrics['Total_Revenue'].sum()),
-        np.linspace(0, 1, len(metrics))
-    )
+    gini = results['customer_gini']
     
     # Create markdown content
     report = """# RFM Analysis Report
@@ -101,4 +102,6 @@ def generate_summary_report(results: dict) -> None:
     print("\n📝 Generated summary report: reports/rfm_analysis_report.md")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data', default='data/online_retail_II.csv')
+    main(parser.parse_args().data)

@@ -63,7 +63,7 @@ def segment_customers_enhanced(rfm: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
     
     # Determine optimal number of clusters using Elbow method
     distortions = []
-    K = range(2, 8)
+    K = range(2, min(6, len(rfm)))
     for k in K:
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
         kmeans.fit(features_scaled)
@@ -78,7 +78,8 @@ def segment_customers_enhanced(rfm: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
             # Find the point where the decrease slows down the most
             relative_deltas = np.abs(deltas) / np.max(np.abs(deltas))
             n_clusters = np.argmax(relative_deltas) + 2  # +2 because we started from k=2
-            n_clusters = min(max(3, n_clusters), 6)  # Keep between 3 and 6 clusters
+            n_clusters = min(max(3, n_clusters), 5)
+    n_clusters = min(n_clusters, len(rfm))
     
     # Final clustering
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
@@ -88,11 +89,10 @@ def segment_customers_enhanced(rfm: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
     segment_means = rfm.groupby('Segment')['Monetary'].mean().sort_values(ascending=False)
     segment_names = [
         'Champions',
-        'Loyal Customers',
+        'Loyal',
         'Potential Loyalists',
         'At Risk',
-        'Hibernating',
-        'Lost Customers'
+        'Big Spenders',
     ][:n_clusters]
     
     # Create mapping from segment number to name, ordered by monetary value

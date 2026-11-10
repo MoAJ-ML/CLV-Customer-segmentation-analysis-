@@ -60,3 +60,6 @@ ENV/
 # Ignore large data files in data/ directory (if any)
 data/*
 !data/README.md
+!tests/
+!tests/fixtures/
+!tests/fixtures/retail_sample.csv

@@ -290,7 +290,7 @@ class AdvancedRFMAnalysis:
         # Calculate Gini using the area under the Lorenz curve
         # Gini = (A) / (A + B) where A + B = 0.5
         # So Gini = 1 - 2 * (area under Lorenz curve)
-        lorenz_area = np.trapz(cum_share, dx=1/n)
+        lorenz_area = np.trapezoid(np.r_[0, cum_share], dx=1/n)
         gini = 1 - 2 * lorenz_area
         
         return gini
@@ -588,5 +588,6 @@ class AdvancedRFMAnalysis:
         
         return {
             'metrics': metrics,
-            'action_plan': action_plan
+            'action_plan': action_plan,
+            'customer_gini': self.calculate_gini(self.rfm['Monetary_w'].to_numpy()),
         }
