@@ -71,7 +71,7 @@ class AdvancedRFMAnalysis:
         metrics = self.rfm.groupby('Segment_Name', observed=True).agg({
             'CustomerID': 'nunique',
             'Frequency': ['sum', 'mean'],  # Using Frequency for total orders (sum) and average frequency (mean)
-            'Monetary_w': ['sum', 'median', 'mean'],
+            'Monetary_raw': ['sum', 'median', 'mean'],
             'Recency': 'median'
         })
         
@@ -81,9 +81,9 @@ class AdvancedRFMAnalysis:
             'CustomerID_nunique': 'Customer_Count',
             'Frequency_sum': 'Total_Orders',  # Total number of orders
             'Frequency_mean': 'Avg_Frequency',
-            'Monetary_w_sum': 'Total_Revenue',
-            'Monetary_w_median': 'Median_Revenue',
-            'Monetary_w_mean': 'Mean_Revenue',
+            'Monetary_raw_sum': 'Total_Revenue',
+            'Monetary_raw_median': 'Median_Revenue',
+            'Monetary_raw_mean': 'Mean_Revenue',
             'Recency_median': 'Median_Recency'
         })
         
@@ -133,7 +133,7 @@ class AdvancedRFMAnalysis:
         medians = self.rfm.groupby('Segment_Name')['log_Monetary'].median().reindex(self.segment_names)
         for i, median in enumerate(medians):
             if not np.isnan(median):  # Only add annotation if median is not NaN
-                ax.text(i, median, f'${int(np.expm1(median)):,}', 
+                ax.text(i, median, f'{int(np.expm1(median)):,}',
                        horizontalalignment='center',
                        size=9, color='black', weight='semibold')
         
@@ -144,13 +144,13 @@ class AdvancedRFMAnalysis:
             num=6
         )
         ax.set_yticks(y_ticks)
-        ax.set_yticklabels([f'${int(np.expm1(y)):,}' for y in y_ticks])
+        ax.set_yticklabels([f'{int(np.expm1(y)):,}' for y in y_ticks])
         
         # Enhance plot appearance
         plt.title('Customer Segment Monetaries\n(Winsorized & Log-Transformed)', 
                  fontsize=14, pad=20, weight='bold')
         plt.xlabel('')
-        plt.ylabel('Spending per Customer (log scale)')
+        plt.ylabel('Spending per Customer (source currency units, log scale)')
         plt.xticks(rotation=45, ha='right')
         
         # Add grid for better readability
@@ -221,11 +221,11 @@ class AdvancedRFMAnalysis:
         )
         ax3.set_title('Average Revenue Per User (ARPU)', fontweight='bold')
         ax3.set_xlabel('')
-        ax3.set_ylabel('ARPU ($)')
+        ax3.set_ylabel('ARPU (source currency units)')
         ax3.tick_params(axis='x', rotation=45)
         
         # Format y-axis as currency
-        ax3.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: f'${x:,.0f}'))
+        ax3.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: f'{x:,.0f}'))
         
         # 4. Key Metrics Table (Bottom)
         ax4 = fig.add_subplot(gs[2, :])
@@ -234,8 +234,8 @@ class AdvancedRFMAnalysis:
         # Prepare table data
         table_data = metrics[['Customer_Count', 'Revenue_Share', 'ARPU', 'AOV', 'Median_Recency']].copy()
         table_data['Revenue_Share'] = table_data['Revenue_Share'].apply(lambda x: f'{x:.1%}')
-        table_data['ARPU'] = table_data['ARPU'].apply(lambda x: f'${x:,.2f}')
-        table_data['AOV'] = table_data['AOV'].apply(lambda x: f'${x:,.2f}')
+        table_data['ARPU'] = table_data['ARPU'].apply(lambda x: f'{x:,.2f}')
+        table_data['AOV'] = table_data['AOV'].apply(lambda x: f'{x:,.2f}')
         table_data['Median_Recency'] = table_data['Median_Recency'].apply(lambda x: f'{int(x)} days')
         
         # Create table
@@ -290,7 +290,7 @@ class AdvancedRFMAnalysis:
         # Calculate Gini using the area under the Lorenz curve
         # Gini = (A) / (A + B) where A + B = 0.5
         # So Gini = 1 - 2 * (area under Lorenz curve)
-        lorenz_area = np.trapz(cum_share, dx=1/n)
+        lorenz_area = np.trapezoid(np.r_[0, cum_share], dx=1/n)
         gini = 1 - 2 * lorenz_area
         
         return gini
@@ -301,15 +301,15 @@ class AdvancedRFMAnalysis:
         Shows the distribution of revenue across customers and highlights key metrics.
         """
         # Sort customers by monetary value (ascending)
-        rfm_sorted = self.rfm.sort_values('Monetary_w')
+        rfm_sorted = self.rfm.sort_values('Monetary_raw')
         
         # Calculate cumulative percentages
         n = len(rfm_sorted)
         rfm_sorted['cumulative_pct_customers'] = np.arange(1, n + 1) / n
-        rfm_sorted['cumulative_pct_revenue'] = rfm_sorted['Monetary_w'].cumsum() / rfm_sorted['Monetary_w'].sum()
+        rfm_sorted['cumulative_pct_revenue'] = rfm_sorted['Monetary_raw'].cumsum() / rfm_sorted['Monetary_raw'].sum()
         
         # Calculate Gini coefficient
-        gini = self.calculate_gini(rfm_sorted['Monetary_w'])
+        gini = self.calculate_gini(rfm_sorted['Monetary_raw'].to_numpy())
         
         # Find the point where 80% of revenue is reached
         pct_customers_at_80pct_revenue = rfm_sorted.loc[
@@ -588,5 +588,6 @@ class AdvancedRFMAnalysis:
         
         return {
             'metrics': metrics,
-            'action_plan': action_plan
+            'action_plan': action_plan,
+            'customer_gini': self.calculate_gini(self.rfm['Monetary_raw'].to_numpy()),
         }

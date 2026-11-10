@@ -19,10 +19,12 @@ def calculate_rfm_scores(rfm: pd.DataFrame) -> pd.DataFrame:
     # Make a copy to avoid modifying the original
     rfm = rfm.copy()
     
-    # Handle outliers
+    # Preserve observed positive-sale revenue for reports and concentration metrics.
+    rfm['Monetary_raw'] = rfm['Monetary']
+    # Use clipped monetary values only for scores and clustering.
     rfm['Monetary'] = winsorize_column(rfm['Monetary'])
     
-    # Cap recency at 700 days (consider older as churned)
+    # Cap recency for scoring only; this does not establish churn status.
     rfm['Recency'] = np.minimum(rfm['Recency'], 700)
     
     # Calculate scores with rank-based approach to handle duplicates
@@ -63,7 +65,7 @@ def segment_customers_enhanced(rfm: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
     
     # Determine optimal number of clusters using Elbow method
     distortions = []
-    K = range(2, 8)
+    K = range(2, min(6, len(rfm)))
     for k in K:
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
         kmeans.fit(features_scaled)
@@ -78,7 +80,8 @@ def segment_customers_enhanced(rfm: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
             # Find the point where the decrease slows down the most
             relative_deltas = np.abs(deltas) / np.max(np.abs(deltas))
             n_clusters = np.argmax(relative_deltas) + 2  # +2 because we started from k=2
-            n_clusters = min(max(3, n_clusters), 6)  # Keep between 3 and 6 clusters
+            n_clusters = min(max(3, n_clusters), 5)
+    n_clusters = min(n_clusters, len(rfm))
     
     # Final clustering
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
@@ -88,11 +91,10 @@ def segment_customers_enhanced(rfm: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
     segment_means = rfm.groupby('Segment')['Monetary'].mean().sort_values(ascending=False)
     segment_names = [
         'Champions',
-        'Loyal Customers',
+        'Loyal',
         'Potential Loyalists',
         'At Risk',
-        'Hibernating',
-        'Lost Customers'
+        'Big Spenders',
     ][:n_clusters]
     
     # Create mapping from segment number to name, ordered by monetary value
@@ -125,20 +127,19 @@ def generate_segment_analysis(rfm: pd.DataFrame) -> None:
     plt.close()
 
 def generate_segment_summary(rfm: pd.DataFrame) -> pd.DataFrame:
-    """Generate summary statistics for each segment."""
-    summary = rfm.groupby('Segment_Name').agg({
-        'CustomerID': 'count',
-        'Recency': 'mean',
-        'Frequency': 'mean',
-        'Monetary': ['mean', 'sum']
-    }).round(2)
-    
-    # Calculate percentages
-    summary[('CustomerID', 'percentage')] = (summary[('CustomerID', 'count')] / len(rfm) * 100).round(1)
-    summary[('Monetary', 'revenue_share')] = (summary[('Monetary', 'sum')] / rfm['Monetary'].sum() * 100).round(1)
-    
-    # Flatten column names
-    summary.columns = ['_'.join(col).strip() for col in summary.columns.values]
+    """Summarize observed positive-sale revenue, not clipped scoring values."""
+    revenue_col = 'Monetary_raw' if 'Monetary_raw' in rfm else 'Monetary'
+    summary = rfm.groupby('Segment_Name').agg(
+        Customer_Count=('CustomerID', 'count'),
+        Avg_Recency=('Recency', 'mean'),
+        Avg_Frequency=('Frequency', 'mean'),
+        Avg_Observed_Revenue=(revenue_col, 'mean'),
+        Total_Observed_Revenue=(revenue_col, 'sum'),
+    ).round(2)
+    summary['Customer_Share_Percent'] = (summary['Customer_Count'] / len(rfm) * 100).round(1)
+    summary['Observed_Revenue_Share_Percent'] = (
+        summary['Total_Observed_Revenue'] / rfm[revenue_col].sum() * 100
+    ).round(1)
     
     # Save to CSV
     summary.to_csv('../visualizations/segment_summary.csv')
