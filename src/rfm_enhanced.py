@@ -19,7 +19,9 @@ def calculate_rfm_scores(rfm: pd.DataFrame) -> pd.DataFrame:
     # Make a copy to avoid modifying the original
     rfm = rfm.copy()
     
-    # Handle outliers
+    # Preserve observed positive-sale revenue for reports and concentration metrics.
+    rfm['Monetary_raw'] = rfm['Monetary']
+    # Use clipped monetary values only for scores and clustering.
     rfm['Monetary'] = winsorize_column(rfm['Monetary'])
     
     # Cap recency at 700 days (consider older as churned)

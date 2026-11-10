@@ -9,8 +9,8 @@ def load_and_clean_data(filepath: str) -> pd.DataFrame:
     # Convert InvoiceDate to datetime
     df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
 
-    # Remove negative quantities (returns)
-    df = df[df['Quantity'] > 0]
+    # Remove returns, cancellations, and nonpositive-price adjustments.
+    df = df[(df['Quantity'] > 0) & (df['Price'] > 0)].copy()
 
     # Create TotalPrice column
     df['TotalPrice'] = df['Quantity'] * df['Price']

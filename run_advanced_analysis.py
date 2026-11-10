@@ -4,6 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
+import hashlib
+import json
+from pathlib import Path
 from src.advanced_analysis import AdvancedRFMAnalysis
 from src.data_preprocessing import load_and_clean_data
 from src.feature_engineering import create_rfm_features
@@ -42,7 +45,21 @@ def main(data_path='data/online_retail_II.csv'):
         results = analyzer.run_analysis()
         
         # Generate summary report
-        generate_summary_report(results)
+        with open(data_path, 'rb') as source:
+            input_sha256 = hashlib.file_digest(source, 'sha256').hexdigest()
+        manifest_path = Path(data_path).with_suffix('.manifest.json')
+        source_sha256 = None
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text())
+            if manifest.get('output_sha256') == input_sha256:
+                source_sha256 = manifest.get('source_sha256')
+        generate_summary_report(results, {
+            'input_name': Path(data_path).name,
+            'input_sha256': input_sha256,
+            'workbook_sha256': source_sha256,
+            'included_rows': len(df),
+            'reference_date': str((df['InvoiceDate'].max() + pd.Timedelta(days=1)).date()),
+        })
         
         print("\n✅ Analysis complete! Check the visualizations/ and reports/ folders for results.")
         
@@ -52,19 +69,26 @@ def main(data_path='data/online_retail_II.csv'):
         traceback.print_exc()
         raise
 
-def generate_summary_report(results: dict) -> None:
+def generate_summary_report(results: dict, snapshot: dict) -> None:
     """Generate a markdown summary report of the analysis."""
     metrics = results['metrics']
-    action_plan = results['action_plan']
     
     # Calculate key metrics
     total_customers = metrics['Customer_Count'].sum()
-    total_revenue = metrics['Total_Revenue'].sum()
     top_segment_rev_share = metrics['Revenue_Share'].max()
     gini = results['customer_gini']
     
     # Create markdown content
-    report = """# RFM Analysis Report
+    report = f"""# RFM Analysis Report
+
+## Input snapshot
+
+- Converted CSV: `{snapshot['input_name']}`
+- CSV SHA-256: `{snapshot['input_sha256']}`
+- Source workbook SHA-256: `{snapshot['workbook_sha256'] or 'not recorded'}`
+- Included positive-sale rows: {snapshot['included_rows']:,}
+- RFM reference date: {snapshot['reference_date']}
+- Monetary unit: source currency units; no conversion applied
 
 ## Executive Summary
 
@@ -77,23 +101,14 @@ def generate_summary_report(results: dict) -> None:
     
     # Add key findings
     report += "\n\n## Key Findings\n"
-    report += f"1. **Revenue Concentration**: The top segment generates {top_segment_rev_share:.1%} of total revenue.\n"
+    report += f"1. **Observed Positive-Sale Revenue**: The top segment accounts for {top_segment_rev_share:.1%} of included positive-sale revenue. Returns and nonpositive-price adjustments are excluded.\n"
     report += f"2. **Customer Distribution**: {metrics.loc['Champions', 'Customer_Count']/total_customers:.1%} of customers are 'Champions' but generate {metrics.loc['Champions', 'Revenue_Share']:.1%} of revenue.\n"
-    report += f"3. **Gini Coefficient**: {gini:.3f}, indicating {'high' if gini > 0.6 else 'moderate'} revenue concentration.\n"
+    report += f"3. **Customer-Level Gini Coefficient**: {gini:.3f} for included positive-sale revenue.\n"
     
-    # Add recommendations
-    report += "\n## Strategic Recommendations\n"
-    report += "### 1. Champion Nurturing\n"
-    report += "- Implement VIP program with exclusive benefits\n"
-    report += "- Offer early access to new products\n"
-    
-    report += "\n### 2. Loyalty Building\n"
-    report += "- Create personalized win-back campaigns for at-risk segments\n"
-    report += "- Develop targeted cross-sell/upsell opportunities\n"
-    
-    report += "\n### 3. Revenue Diversification\n"
-    report += f"- Focus on increasing share of wallet in the top {len(metrics[metrics['Revenue_Share'] > 0.1])} segments\n"
-    report += "- Implement customer referral program\n"
+    report += "\n## Interpretation limits\n"
+    report += "These labels are descriptive cluster names, not validated loyalty or churn states. "
+    report += "The analysis does not predict CLV, prove treatment effects, or justify a specific campaign. "
+    report += "Test any proposed intervention separately with a defined outcome and comparison group.\n"
     
     # Save report
     with open('reports/rfm_analysis_report.md', 'w') as f:
