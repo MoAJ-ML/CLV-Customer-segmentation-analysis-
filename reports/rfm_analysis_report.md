@@ -1,29 +1,5 @@
-# RFM Analysis Report
+# RFM analysis report status
 
-## Executive Summary
+This committed report is a placeholder for a reproducible run on the UCI Online Retail II workbook. The former report's segment totals and Gini value could not be tied to an available input snapshot and must not be cited as current results.
 
-### Customer Segmentation Overview
-
-### Segment Metrics
-| Segment_Name        |   Customer_Count |   Revenue_Share |    ARPU |   Median_Recency |
-|:--------------------|-----------------:|----------------:|--------:|-----------------:|
-| Champions           |             1307 |       0.931835  | 7496.87 |               17 |
-| Potential Loyalists |             2216 |       0.0681649 |  323.45 |              393 |
-
-## Key Findings
-1. **Revenue Concentration**: The top segment generates 93.2% of total revenue.
-2. **Customer Distribution**: 37.1% of customers are 'Champions' but generate 93.2% of revenue.
-3. **Gini Coefficient**: 0.000, indicating moderate revenue concentration.
-
-## Strategic Recommendations
-### 1. Champion Nurturing
-- Implement VIP program with exclusive benefits
-- Offer early access to new products
-
-### 2. Loyalty Building
-- Create personalized win-back campaigns for at-risk segments
-- Develop targeted cross-sell/upsell opportunities
-
-### 3. Revenue Diversification
-- Focus on increasing share of wallet in the top 1 segments
-- Implement customer referral program
+Download the workbook from the source linked in `README.md`, run `prepare_data.py` to record input and output hashes, then run `run_advanced_analysis.py --data data/online_retail_II.csv` to regenerate this report. The project describes historical RFM segments; it does not predict customer lifetime value.
